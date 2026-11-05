@@ -19,6 +19,11 @@ from pathlib import Path
 NASA_URL = (
     "https://downloads.sourceforge.net/project/gmat/GMAT/GMAT-R2026a/gmat-mac-x64-R2026a-signed.dmg"
 )
+NASA_SHA256 = "8a81d22ce2d39504eadc875d71494321adb49f60da92d266fdbe660de0f771d2"
+NASA_MIRRORS = (
+    NASA_URL.replace("downloads.sourceforge.net", "gigenet.dl.sourceforge.net"),
+    NASA_URL.replace("downloads.sourceforge.net", "master.dl.sourceforge.net"),
+)
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -31,16 +36,68 @@ def output(*args):
     return run(*args, capture_output=True, text=True).stdout.strip()
 
 
-def download(url, destination):
-    run("curl", "--fail", "--location", "--retry", "4", "--output", destination, url)
-    with destination.open("rb") as file:
-        digest = hashlib.file_digest(file, "sha256").hexdigest()
-    return {"url": url, "sha256": digest}
+def file_digest(path):
+    with path.open("rb") as file:
+        return hashlib.file_digest(file, "sha256").hexdigest()
+
+
+def download(url, destination, *, expected_sha256=None, fallbacks=()):
+    if destination.is_file() and expected_sha256 and file_digest(destination) == expected_sha256:
+        print(f"Using verified download cache: {destination.name}", flush=True)
+        return {"url": url, "sha256": expected_sha256, "cached": True}
+    partial = destination.with_name(destination.name + ".part")
+    errors = []
+    for candidate in (url, *fallbacks):
+        try:
+            options = [
+                "--fail",
+                "--location",
+                "--connect-timeout",
+                "20",
+                "--max-time",
+                "600",
+                "--retry",
+                "1",
+                "--retry-all-errors",
+                "--retry-delay",
+                "1",
+                "--silent",
+                "--show-error",
+                "--write-out",
+                "%{speed_download}",
+            ]
+            if fallbacks:
+                # CI should change mirrors instead of spending half an hour on
+                # a throttled connection. Smaller JPL downloads keep normal retries.
+                options += ["--speed-limit", "1048576", "--speed-time", "30"]
+            result = run(
+                "curl", *options, "--output", partial, candidate, capture_output=True, text=True
+            )
+            digest = file_digest(partial)
+            if expected_sha256 and digest != expected_sha256:
+                raise ValueError(f"SHA-256 mismatch: expected {expected_sha256}, received {digest}")
+            partial.replace(destination)
+            print(
+                f"Downloaded {destination.name}: {result.stdout.strip()} bytes/second", flush=True
+            )
+            return {"url": url, "mirror": candidate, "sha256": digest, "cached": False}
+        except (subprocess.CalledProcessError, ValueError) as error:
+            diagnostic = (
+                error.stderr if isinstance(error, subprocess.CalledProcessError) else str(error)
+            )
+            errors.append(f"{candidate}: {diagnostic}")
+            print(f"Download attempt failed: {errors[-1]}", flush=True)
+        finally:
+            partial.unlink(missing_ok=True)
+    raise RuntimeError("All download attempts failed:\n" + "\n".join(errors))
 
 
 def nasa_install(work):
     image = work / "nasa.dmg"
-    receipt = download(NASA_URL, image)
+    receipt = download(NASA_URL, image, expected_sha256=NASA_SHA256, fallbacks=NASA_MIRRORS)
+    if os.environ.get("GITHUB_ENV"):
+        with open(os.environ["GITHUB_ENV"], "a") as file:
+            file.write("GMAT_NASA_DOWNLOADED=1\n")
     mount = work / "nasa-mount"
     mount.mkdir()
     run("hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", mount, image)

@@ -174,3 +174,18 @@ The initial public [portable workflow](https://github.com/dcajacob/GMAT-mcp/acti
 passed all eight jobs: Linux, Windows, Apple Silicon and Intel macOS, each with server
 Python 3.11 and 3.14. Mac jobs reported 48 passed and three platform-specific skips.
 The subsequent POSIX process-group regression raises the portable test count by one.
+
+The first Apple Silicon native job passed on macOS 15.8.2 with Python 3.14 server /
+3.12.10 workers: 61 passed, three platform skips, 225.77 seconds. Native
+`QtGui.McpBridge` passed separately in 1.26 seconds. This initial-source result is
+[run 41971514954](https://github.com/dcajacob/GMAT-mcp/actions/runs/41971514954),
+commit `01c207e654096a55d759cbdf16a477741a8e4574`; the release candidate also adds a
+POSIX process-group check and clean-wheel verification.
+
+NASA's Mac engine reports R2026a, March 26, 2026, and 567 classes on Apple Silicon.
+The pinned Qt engine reports R2026a, November 5, 2026, and 561 classes. The official
+NASA DMG SHA-256 is `8a81d22ce2d39504eadc875d71494321adb49f60da92d266fdbe660de0f771d2`.
+The artifact retains complete native build/download receipts and engine library hashes.
+
+The release-candidate [portable workflow](https://github.com/dcajacob/GMAT-mcp/actions/runs/41972376137)
+passed all eight jobs, including the new process-group regression.

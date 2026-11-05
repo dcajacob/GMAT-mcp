@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: native-macos-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native:
     strategy:
@@ -40,17 +44,30 @@ jobs:
       - run: uv sync --locked
       - name: Install native build dependencies
         run: brew install cmake swig qt open-scene-graph xerces-c
+      - name: Restore verified universal NASA image
+        id: nasa-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/gmat-native/nasa.dmg
+          key: nasa-mac-r2026a-8a81d22ce2d39504eadc875d71494321adb49f60da92d266fdbe660de0f771d2
       - name: Prepare independent NASA and API-enabled Qt installations
         run: >-
           uv run python tools/prepare_macos.py
           --qt-source .native-qt
           --worker-python '${{ steps.worker.outputs.python-path }}'
           --work "$RUNNER_TEMP/gmat-native"
+      - name: Retain verified NASA download for later jobs
+        if: always() && env.GMAT_NASA_DOWNLOADED == '1' && steps.nasa-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/gmat-native/nasa.dmg
+          key: ${{ steps.nasa-cache.outputs.cache-primary-key }}
       - name: Check bindings and startup
         run: uv run gmat-mcp --config "$GMAT_MCP_TEST_CONFIG" doctor > test-results/macos/doctor.json
       - name: Qualify both engines over both transports
         run: uv run pytest -q --junitxml=test-results/macos/qualification.xml
       - name: Qualify native GUI contention and document ownership
+        if: always() && env.GMAT_QT_TEST_BUILD != ''
         run: ctest --test-dir "$GMAT_QT_TEST_BUILD" -R '^QtGui.McpBridge$' --output-on-failure --output-log "$GITHUB_WORKSPACE/test-results/macos/qt-bridge.log"
       - name: Build installation artifacts
         run: uv run python tools/build_release.py

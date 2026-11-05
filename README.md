@@ -12,6 +12,8 @@ not bundle GMAT. See [qualification evidence](VALIDATION.md) for current results
 Use Python 3.11+ and [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```sh
+git clone https://github.com/dcajacob/GMAT-mcp.git
+cd GMAT-mcp
 uv sync --locked
 uv run gmat-mcp discover --root /path/to/GMAT --root /path/to/GMAT-Qt/application
 uv run gmat-mcp init --root /path/to/GMAT --root /path/to/GMAT-Qt/application --output profiles.local.toml
@@ -118,6 +120,9 @@ NASA's signed image, builds a pinned API-enabled Qt revision with Homebrew depen
 and runs both engines through stdio and authenticated HTTP. It retains source/download
 receipts, diagnostic output, JUnit results and the C++ bridge test log. GUI checks use
 Qt's offscreen platform and do not qualify hardware rendering.
+The official universal NASA image is cached between CI jobs and checked against its
+recorded SHA-256 before use. Slow transfers switch to another official SourceForge
+mirror; every downloaded image must match the same hash.
 
 ### Release bundle
 
