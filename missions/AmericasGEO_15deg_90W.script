@@ -1,0 +1,83 @@
+% Americas inclined geosynchronous loiter orbit -- NASA GMAT R2026a.
+% Initial epoch: 04 Nov 2026 00:00:00 UTC; angles are EarthMJ2000Eq.
+% Circular GEO radius 42164.169613508 km, period 86164.0905 s.
+% Perigee/apogee radii = GEO radius -/+ 1000 km.
+% Apogee is near the northward latitude extremum at 90 deg W at the epoch.
+% This is a geosynchronous drifting ground track, without stationkeeping burns.
+% Dynamics: Earth JGM3 4x4, Sun/Luna point masses, no SRP/drag.
+% GUI: open this script and Run to populate the OrbitView and GroundTrackPlot.
+
+% Inclined geosynchronous orbit favoring the Americas.
+Create Spacecraft AmericasGEO;
+GMAT AmericasGEO.DateFormat = UTCGregorian;
+GMAT AmericasGEO.Epoch = '04 Nov 2026 00:00:00.000';
+GMAT AmericasGEO.CoordinateSystem = EarthMJ2000Eq;
+GMAT AmericasGEO.DisplayStateType = Keplerian;
+GMAT AmericasGEO.SMA = 42164.16961350808;
+GMAT AmericasGEO.ECC = 0.023716819497842816;
+GMAT AmericasGEO.INC = 15;
+GMAT AmericasGEO.RAAN = 222.9409657635839;
+GMAT AmericasGEO.AOP = 270;
+GMAT AmericasGEO.TA = 180;
+GMAT AmericasGEO.DryMass = 1000;
+
+Create ForceModel GeoForces;
+GMAT GeoForces.CentralBody = Earth;
+GMAT GeoForces.PrimaryBodies = {Earth};
+GMAT GeoForces.PointMasses = {Luna, Sun};
+GMAT GeoForces.GravityField.Earth.Degree = 4;
+GMAT GeoForces.GravityField.Earth.Order = 4;
+GMAT GeoForces.GravityField.Earth.PotentialFile = 'JGM3.cof';
+GMAT GeoForces.Drag = None;
+GMAT GeoForces.SRP = Off;
+GMAT GeoForces.RelativisticCorrection = Off;
+
+Create Propagator GeoProp;
+GMAT GeoProp.FM = GeoForces;
+GMAT GeoProp.Type = RungeKutta89;
+GMAT GeoProp.InitialStepSize = 60;
+GMAT GeoProp.Accuracy = 1e-12;
+GMAT GeoProp.MinStep = 0.001;
+GMAT GeoProp.MaxStep = 300;
+
+Create CoordinateSystem AmericasFixed;
+GMAT AmericasFixed.Origin = Earth;
+GMAT AmericasFixed.Axes = BodyFixed;
+
+Create OrbitView AmericasOrbit;
+GMAT AmericasOrbit.Add = {AmericasGEO, Earth};
+GMAT AmericasOrbit.CoordinateSystem = EarthMJ2000Eq;
+GMAT AmericasOrbit.DataCollectFrequency = 1;
+GMAT AmericasOrbit.UpdatePlotFrequency = 25;
+GMAT AmericasOrbit.MaxPlotPoints = 20000;
+GMAT AmericasOrbit.NumPointsToRedraw = 0;
+GMAT AmericasOrbit.ShowPlot = true;
+GMAT AmericasOrbit.ViewPointReference = Earth;
+GMAT AmericasOrbit.ViewPointVector = [70000 -100000 80000];
+GMAT AmericasOrbit.ViewDirection = Earth;
+GMAT AmericasOrbit.ViewUpCoordinateSystem = EarthMJ2000Eq;
+GMAT AmericasOrbit.ViewUpAxis = Z;
+GMAT AmericasOrbit.XYPlane = On;
+GMAT AmericasOrbit.Axes = On;
+
+Create GroundTrackPlot AmericasGroundTrack;
+GMAT AmericasGroundTrack.Add = {AmericasGEO};
+GMAT AmericasGroundTrack.CentralBody = Earth;
+GMAT AmericasGroundTrack.DataCollectFrequency = 1;
+GMAT AmericasGroundTrack.UpdatePlotFrequency = 25;
+GMAT AmericasGroundTrack.NumPointsToRedraw = 0;
+GMAT AmericasGroundTrack.ShowPlot = true;
+
+Create ReportFile AmericasTrack;
+GMAT AmericasTrack.Filename = 'americas_geo_groundtrack.txt';
+GMAT AmericasTrack.Precision = 16;
+GMAT AmericasTrack.WriteHeaders = true;
+
+Create Variable SampleIndex;
+BeginMissionSequence;
+Report AmericasTrack AmericasGEO.ElapsedSecs AmericasGEO.UTCModJulian AmericasGEO.Earth.Longitude AmericasGEO.Earth.Latitude AmericasGEO.Earth.Altitude AmericasGEO.Earth.RMAG AmericasGEO.SMA AmericasGEO.ECC AmericasGEO.INC AmericasGEO.RAAN AmericasGEO.AOP AmericasGEO.TA AmericasGEO.AmericasFixed.X AmericasGEO.AmericasFixed.Y AmericasGEO.AmericasFixed.Z AmericasGEO.EarthMJ2000Eq.X AmericasGEO.EarthMJ2000Eq.Y AmericasGEO.EarthMJ2000Eq.Z AmericasGEO.EarthMJ2000Eq.VX AmericasGEO.EarthMJ2000Eq.VY AmericasGEO.EarthMJ2000Eq.VZ;
+For SampleIndex = 1:1:864;
+   Propagate GeoProp(AmericasGEO) {AmericasGEO.ElapsedSecs = 299.1808697916667};
+   Report AmericasTrack AmericasGEO.ElapsedSecs AmericasGEO.UTCModJulian AmericasGEO.Earth.Longitude AmericasGEO.Earth.Latitude AmericasGEO.Earth.Altitude AmericasGEO.Earth.RMAG AmericasGEO.SMA AmericasGEO.ECC AmericasGEO.INC AmericasGEO.RAAN AmericasGEO.AOP AmericasGEO.TA AmericasGEO.AmericasFixed.X AmericasGEO.AmericasFixed.Y AmericasGEO.AmericasFixed.Z AmericasGEO.EarthMJ2000Eq.X AmericasGEO.EarthMJ2000Eq.Y AmericasGEO.EarthMJ2000Eq.Z AmericasGEO.EarthMJ2000Eq.VX AmericasGEO.EarthMJ2000Eq.VY AmericasGEO.EarthMJ2000Eq.VZ;
+EndFor;
+

@@ -1,0 +1,18 @@
+# Set root to the directory containing bin/, data/, plugins/ and api/.
+# Relative paths are resolved against this TOML file's directory.
+[server]
+max_sessions = 4
+run_timeout = 1800
+# data_dir = "./.gmat-mcp"
+
+[profiles.nasa-r2026a]
+variant = "nasa"
+root = "/path/to/GMAT/R2026a"
+python_executable = "/usr/bin/python3.12"
+# startup_file = "/path/to/GMAT/R2026a/bin/gmat_startup_file.txt"
+
+[profiles.gmat-qt]
+variant = "qt"
+root = "/path/to/GMAT-Qt/application"
+python_executable = "/usr/bin/python3.14"
+# Defaults to bin/gmat_startup_qt.txt if present.

@@ -1,0 +1,17 @@
+# Forward slashes and literal single-quoted TOML strings both work on Windows.
+[server]
+max_sessions = 4
+run_timeout = 1800
+# data_dir = 'C:\Users\you\AppData\Local\gmat-mcp'
+# desktop_discovery_dir = 'C:\Users\you\AppData\Local\gmat-mcp\desktops'
+
+[profiles.nasa-r2026a]
+variant = "nasa"
+root = 'C:\GMAT\R2026a'
+python_executable = 'C:\Users\you\AppData\Local\Programs\Python\Python312\python.exe'
+
+[profiles.gmat-qt]
+variant = "qt"
+root = 'C:\src\GMAT-Qt\application'
+python_executable = 'C:\Users\you\AppData\Local\Programs\Python\Python312\python.exe'
+# startup_file = 'C:\src\GMAT-Qt\application\bin\gmat_startup_qt.txt'

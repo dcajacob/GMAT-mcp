@@ -1,0 +1,18 @@
+# Use a CPython matching both the binding's minor version and native architecture.
+[server]
+max_sessions = 4
+run_timeout = 1800
+# data_dir = "/Users/you/Library/Application Support/gmat-mcp"
+
+[profiles.nasa-r2026a]
+variant = "nasa"
+root = "/Applications/GMAT/R2026a"
+python_executable = "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+
+[profiles.gmat-qt]
+variant = "qt"
+root = "/Users/you/src/GMAT-Qt/application"
+python_executable = "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+# An API-enabled packaged desktop may instead select its .app directly:
+# root = "/Applications/GMAT-Qt/GMAT-Qt.app"
+# startup_file = "/Applications/GMAT-Qt/gmat_startup_qt.txt"

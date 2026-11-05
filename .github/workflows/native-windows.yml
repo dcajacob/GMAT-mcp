@@ -1,0 +1,29 @@
+name: Native Windows qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    # Dedicated runner supplies NASA R2026a and an API/bridge-enabled Qt build.
+    # It must set GMAT_MCP_TEST_CONFIG to a two-profile TOML file.
+    runs-on: [self-hosted, Windows, X64, gmat]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.7'
+          python-version: '3.14'
+      - shell: pwsh
+        run: |
+          if (-not $env:GMAT_MCP_TEST_CONFIG) { throw 'Configure both native installations on this runner.' }
+          ./tools/Qualify-Windows.ps1 -Config $env:GMAT_MCP_TEST_CONFIG
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: windows-qualification
+          path: test-results/windows

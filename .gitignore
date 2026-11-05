@@ -1,0 +1,10 @@
+.venv/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+dist/
+.gmat-mcp/
+profiles.local.toml
+test-results/
+.native-qt/

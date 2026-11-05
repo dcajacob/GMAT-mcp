@@ -1,0 +1,65 @@
+name: Native macOS qualification
+
+on:
+  push:
+    branches: [main, 'codex/macos*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      QT_QPA_PLATFORM: offscreen
+      QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out the qualified Qt source
+        uses: actions/checkout@v7
+        with:
+          repository: dcajacob/GMAT-Qt
+          ref: e0aa985a37769ad25d17d96275c4a0d2410f1a0e
+          path: .native-qt
+      - uses: actions/setup-python@v6
+        id: worker
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.7'
+          python-version: '3.14'
+      - run: uv sync --locked
+      - name: Install native build dependencies
+        run: brew install cmake swig qt open-scene-graph xerces-c
+      - name: Prepare independent NASA and API-enabled Qt installations
+        run: >-
+          uv run python tools/prepare_macos.py
+          --qt-source .native-qt
+          --worker-python '${{ steps.worker.outputs.python-path }}'
+          --work "$RUNNER_TEMP/gmat-native"
+      - name: Check bindings and startup
+        run: uv run gmat-mcp --config "$GMAT_MCP_TEST_CONFIG" doctor > test-results/macos/doctor.json
+      - name: Qualify both engines over both transports
+        run: uv run pytest -q --junitxml=test-results/macos/qualification.xml
+      - name: Qualify native GUI contention and document ownership
+        run: ctest --test-dir "$GMAT_QT_TEST_BUILD" -R '^QtGui.McpBridge$' --output-on-failure --output-log "$GITHUB_WORKSPACE/test-results/macos/qt-bridge.log"
+      - name: Build installation artifacts
+        run: uv run python tools/build_release.py
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: macos-qualification-${{ matrix.os }}
+          path: |
+            test-results/macos
+            ${{ runner.temp }}/gmat-native/qt-build/CMakeFiles/CMakeConfigureLog.yaml
+            ${{ runner.temp }}/gmat-native/qt-build/Testing/Temporary/LastTest.log
+          retention-days: 30
