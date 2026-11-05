@@ -125,11 +125,10 @@ ctest --test-dir /path/to/GMAT-Qt/build/linux-gui -R '^QtGui.McpBridge$' --outpu
 
 ## Limits
 
-The portable CI matrix targets Linux and Windows with Python 3.11 and 3.14.
+The portable CI matrix targets Linux, Windows, Apple Silicon and Intel macOS with Python 3.11 and 3.14.
 `native-windows.yml` provides manual qualification on a dedicated configured runner;
 `release.yml` builds an installation candidate after the portable matrix passes.
-These workflows were added locally; hosted GitHub execution is not claimed.
-macOS qualification remains deferred.
+The public hosted workflows are now running; see the macOS section below for qualification status.
 
 Windows bridge qualification uses Qt's offscreen platform. It verifies editing,
 execution, results, pause/resume, cooperative cancellation and application preservation;
@@ -164,3 +163,14 @@ FAT32/FAT64 in both byte orders, truncated/mismatched slices, mixed-module
 architecture rejection, source/app-bundle discovery, sidecar startup relocation,
 NASA API symlinks, and selected-installation-only DYLD paths. These synthetic
 fixtures establish loader/setup behavior, not native mission correctness.
+
+Local Linux regression of the macOS implementation passed 62 tests with two Windows-only
+skips in 167.37 seconds. The separate POSIX descendant-cleanup regression also passed.
+The updated Qt C++ bridge regression passed in 0.70 seconds. A clean, hash-locked
+wheel installation propagated the headless Americas GEO mission successfully on both
+local engines; results are retained in `test-results/macos-linux-wheel-smoke.json`.
+
+The initial public [portable workflow](https://github.com/dcajacob/GMAT-mcp/actions/runs/41971514934)
+passed all eight jobs: Linux, Windows, Apple Silicon and Intel macOS, each with server
+Python 3.11 and 3.14. Mac jobs reported 48 passed and three platform-specific skips.
+The subsequent POSIX process-group regression raises the portable test count by one.

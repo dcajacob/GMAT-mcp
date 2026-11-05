@@ -137,3 +137,34 @@ async def test_windows_job_kills_descendants(fake_config, tmp_path):
         if process.returncode is None:
             process.kill()
             await process.wait()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process-group ownership")
+async def test_posix_worker_group_terminates_descendants():
+    import asyncio
+
+    from gmat_mcp.process import process_alive, spawn_options, terminate
+
+    # The parent reaps its child after SIGTERM; success requires delivery to the
+    # entire private process group, rather than just the worker's PID.
+    code = """
+import signal, subprocess, sys, time
+child = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(120)'])
+def stopped(signum, frame):
+    child.wait(timeout=2)
+    sys.exit(0)
+signal.signal(signal.SIGTERM, stopped)
+print(child.pid, flush=True)
+time.sleep(120)
+"""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-u", "-c", code, stdout=asyncio.subprocess.PIPE, **spawn_options()
+    )
+    try:
+        child = int(await asyncio.wait_for(process.stdout.readline(), 10))
+        assert process_alive(child)
+        await terminate(process)
+        assert process.returncode == 0
+        assert not process_alive(child)
+    finally:
+        await terminate(process)

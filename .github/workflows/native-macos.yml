@@ -54,6 +54,14 @@ jobs:
         run: ctest --test-dir "$GMAT_QT_TEST_BUILD" -R '^QtGui.McpBridge$' --output-on-failure --output-log "$GITHUB_WORKSPACE/test-results/macos/qt-bridge.log"
       - name: Build installation artifacts
         run: uv run python tools/build_release.py
+      - name: Verify a clean wheel installation against both engines
+        shell: bash
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/runtime.lock" > /dev/null
+          uv venv --python 3.14 "$RUNNER_TEMP/installed-gmat-mcp"
+          uv pip install --python "$RUNNER_TEMP/installed-gmat-mcp/bin/python" --require-hashes -r "$RUNNER_TEMP/runtime.lock"
+          uv pip install --python "$RUNNER_TEMP/installed-gmat-mcp/bin/python" --no-deps dist/*.whl
+          "$RUNNER_TEMP/installed-gmat-mcp/bin/python" tools/smoke_installation.py --config "$GMAT_MCP_TEST_CONFIG" --mission missions/AmericasGEO_15deg_90W_headless.script --output test-results/macos/clean-wheel-smoke.json
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:

@@ -134,7 +134,7 @@ After checking the separately distributed zip checksum and extracting the bundle
 & C:\Tools\gmat-mcp-env\Scripts\gmat-mcp.exe discover --root C:\GMAT
 ```
 
-On Linux use `python3 tools/build_release.py --uv /path/to/uv` to build and
+On Linux and macOS use `python3 tools/build_release.py --uv /path/to/uv` to build and
 `python3 install.py --destination /path/to/new/venv` inside the extracted bundle
 to install. Installation creates a fresh environment and downloads only locked,
 hash-verified runtime dependencies. Configure the MCP client with the resulting

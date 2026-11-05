@@ -47,8 +47,13 @@ namespace {
 QString stamp() { return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs); }
 QString installationRoot() {
    const QDir binary(QCoreApplication::applicationDirPath());
-   if (binary.dirName()=="MacOS" && QDir(binary.absoluteFilePath("..")).dirName()=="Contents")
-      return QDir(binary.absoluteFilePath("../..")).absolutePath();
+   if (binary.dirName()=="MacOS" && QDir(binary.absoluteFilePath("..")).dirName()=="Contents") {
+      const QDir app(binary.absoluteFilePath("../.."));
+      const QDir parent(app.absoluteFilePath(".."));
+      if(parent.dirName()=="bin" && QFileInfo::exists(parent.filePath("gmat_startup_file.txt")))
+         return QDir(parent.absoluteFilePath("..")).absolutePath();
+      return app.absolutePath();
+   }
    return QDir(binary.absoluteFilePath("..")).absolutePath();
 }
 void protect(const QString &path, bool directory) {

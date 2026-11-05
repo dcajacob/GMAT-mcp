@@ -55,7 +55,13 @@ def library_directories(binary: Path) -> list[Path]:
         binary.parent / "plugins/proprietary",
     ]
     if binary.name == "MacOS" and binary.parent.name == "Contents":
-        directories += [binary.parent / "Frameworks", binary.parent / "PlugIns"]
+        directories += [
+            binary.parent / "Frameworks",
+            binary.parent / "Frameworks/plugins",
+            binary.parent / "Frameworks/plugins/proprietary",
+            binary.parent / "PlugIns",
+            binary.parent / "PlugIns/proprietary",
+        ]
     # NASA installs API symlinks in bin/gmatpy pointing into its signed app.
     # Follow only those bindings, rather than importing a second sibling app.
     for path in sorted((binary / "gmatpy").glob("_py*/*")):
@@ -63,6 +69,12 @@ def library_directories(binary: Path) -> list[Path]:
             continue
         for parent in path.resolve().parents:
             if parent.name == "Frameworks" and parent.parent.name == "Contents":
-                directories += [parent, parent / "plugins", parent.parent / "PlugIns"]
+                directories += [
+                    parent,
+                    parent / "plugins",
+                    parent / "plugins/proprietary",
+                    parent.parent / "PlugIns",
+                    parent.parent / "PlugIns/proprietary",
+                ]
                 break
     return list(dict.fromkeys(directories))

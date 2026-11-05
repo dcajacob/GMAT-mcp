@@ -33,7 +33,9 @@ def output(*args):
 
 def download(url, destination):
     run("curl", "--fail", "--location", "--retry", "4", "--output", destination, url)
-    return {"url": url, "sha256": hashlib.file_digest(destination.open("rb"), "sha256").hexdigest()}
+    with destination.open("rb") as file:
+        digest = hashlib.file_digest(file, "sha256").hexdigest()
+    return {"url": url, "sha256": digest}
 
 
 def nasa_install(work):
@@ -141,11 +143,13 @@ def main():
     args.work.mkdir(parents=True, exist_ok=True)
     args.output.mkdir(parents=True, exist_ok=True)
     nasa, nasa_receipt = nasa_install(args.work)
+    (args.output / "nasa-download.json").write_text(json.dumps(nasa_receipt, indent=2) + "\n")
     qt, build, qt_receipt = qt_install(args.qt_source.resolve(), args.worker_python, args.work)
     receipt = {
         "platform": platform.platform(),
         "architecture": platform.machine(),
         "worker": output(args.worker_python, "--version"),
+        "homebrew": output("brew", "list", "--versions"),
         "nasa": nasa_receipt,
         "qt": qt_receipt,
     }
