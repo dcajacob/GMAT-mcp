@@ -88,8 +88,9 @@ def worker_environment(bin_dir: Path, loader: Path | None = None) -> dict[str, s
     )
     if sys.platform == "darwin":
         # Only the selected installation supplies GMAT dyld overrides.
-        env.pop("DYLD_INSERT_LIBRARIES", None)
-        env.pop("DYLD_FRAMEWORK_PATH", None)
+        for name in list(env):
+            if name.startswith("DYLD_"):
+                del env[name]
         env[key] = os.pathsep.join(paths)
         env["DYLD_FALLBACK_LIBRARY_PATH"] = os.pathsep.join(paths)
     else:

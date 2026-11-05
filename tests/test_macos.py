@@ -151,7 +151,18 @@ def test_nasa_app_aliases_and_selected_dyld_directories(tmp_path, monkeypatch):
     monkeypatch.setattr(process.sys, "platform", "darwin")
     monkeypatch.setenv("DYLD_LIBRARY_PATH", "/some/other/GMAT")
     monkeypatch.setenv("DYLD_INSERT_LIBRARIES", "/some/other/dylib")
+    inherited = (
+        "DYLD_FRAMEWORK_PATH",
+        "DYLD_FALLBACK_FRAMEWORK_PATH",
+        "DYLD_VERSIONED_LIBRARY_PATH",
+        "DYLD_VERSIONED_FRAMEWORK_PATH",
+        "DYLD_ROOT_PATH",
+        "DYLD_IMAGE_SUFFIX",
+    )
+    for variable in inherited:
+        monkeypatch.setenv(variable, "/some/other/GMAT")
     environment = worker_environment(binary)
     assert str(framework) in environment["DYLD_LIBRARY_PATH"]
     assert "other/GMAT" not in environment["DYLD_LIBRARY_PATH"]
     assert "DYLD_INSERT_LIBRARIES" not in environment
+    assert not any(variable in environment for variable in inherited)
