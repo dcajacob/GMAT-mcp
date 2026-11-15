@@ -3,6 +3,9 @@
 Interactive MCP mission design for NASA GMAT R2026a and GMAT-Qt, with isolated
 workers, sampled results, transactional editing, saved projects, trade studies
 and an optional live GMAT-Qt desktop connection.
+
+GMAT MCP is an independent project and is not affiliated with or endorsed by NASA.
+
 Native macOS 15 qualification passes on Apple Silicon and Intel with both engines
 over stdio and authenticated HTTP. Linux regression and the portable matrix for
 Linux, Windows and macOS also pass. This project does not bundle GMAT. See
