@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import contextlib
 import hashlib
 import json
 import os
@@ -71,6 +70,7 @@ class Worker:
     plugins: list[str]
     timeout: float
     job: object | None = None
+    _close_task: asyncio.Task | None = field(default=None, init=False)
 
     @classmethod
     async def start(cls, profile: Profile, workspace: Path, timeout: float) -> Worker:
@@ -148,6 +148,7 @@ class Worker:
 
     async def call(self, operation: str, *, timeout: float | None = None, **arguments) -> dict:
         if self.process.returncode is not None:
+            await self.close()
             raise GmatError("WORKER_LOST", f"GMAT worker exited ({self.process.returncode})")
         try:
             self.process.stdin.write(
@@ -160,6 +161,11 @@ class Worker:
         return await self.receive(timeout or self.timeout)
 
     async def close(self):
+        if self._close_task is None:
+            self._close_task = asyncio.create_task(self._close())
+        await asyncio.shield(self._close_task)
+
+    async def _close(self):
         if self.job is not None:
             self.job.close()
         await terminate(self.process)
@@ -404,7 +410,7 @@ class Manager(Capabilities):
                 parsed_spec = embedded_spec(snapshot["text"])
                 if parsed_spec:
                     snapshot["datasets"] = collection(parsed_spec)
-                return await self._stage(session, snapshot)
+                return await self._stage(session, snapshot, expected_version=expected_version)
         async with session.lock:
             worker = await Worker.start(
                 session.profile,
@@ -652,15 +658,16 @@ class Manager(Capabilities):
         if task is None and run["status"] in ("queued", "running"):
             session = self.sessions.get(run["session_id"])
             if session and session.backend == "desktop":
-                await session.worker.rpc("stop")
+                await session.worker.control_run("stop", run_id)
                 self.runs[run_id]["cancellation_requested"] = True
                 await self.inspect_session(session.id)
         if task:
             # Let a freshly queued task enter its try/finally before cancellation.
             await asyncio.sleep(0)
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            # Once execution has ended, keep the worker and finish persisting its results.
+            if self.runs[run_id]["status"] in ("queued", "running") and not task.cancelling():
+                task.cancel()
+            await asyncio.shield(task)
         return self.get_run(run_id)
 
     def get_logs(self, session_id: str, offset: int = 0, limit: int = 16384) -> dict:

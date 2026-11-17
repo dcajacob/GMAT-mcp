@@ -222,18 +222,21 @@ async def test_optimizer_seed_budget_and_immediate_cancel(manager):
         "metrics": [{"name": "mass", "object": "Sat", "field": "DryMass"}],
         "objective": {"metric": "mass"},
         "constraints": [{"metric": "mass", "op": ">=", "value": 150}],
-        "max_evaluations": 10,
+        "max_evaluations": 7,
     }
     parameters = []
     for _ in range(2):
         study = await manager.start_study(sid, spec)
         await manager.study_tasks[study["study_id"]]
         completed = manager.get_study(study["study_id"])
-        assert completed["status"] == "succeeded" and completed["evaluations"] <= 10, completed
+        assert completed["status"] == "succeeded" and completed["evaluations"] == 7, completed
+        assert completed["stop_reason"] == "evaluation_budget"
         assert completed["best"]["objective"] >= 150
-        parameters.append(
-            [c["parameters"] for c in manager.list_study_cases(study["study_id"])["cases"]]
+        cases = manager.list_study_cases(study["study_id"])["cases"]
+        assert len(cases) == 7 and all(
+            c["status"] == "succeeded" and "objective" in c for c in cases
         )
+        parameters.append([c["parameters"] for c in cases])
     assert parameters[0] == parameters[1]
     study = await manager.start_study(sid, spec)
     assert (await manager.cancel_study(study["study_id"]))["status"] == "cancelled"

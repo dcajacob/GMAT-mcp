@@ -105,6 +105,22 @@ class DesktopWorker:
         self.state = state
         return state
 
+    async def control_run(self, operation, run_id):
+        if "run_id_control" not in self.info.get("capabilities", []):
+            raise GmatError(
+                "UNSUPPORTED_CAPABILITY",
+                "This desktop needs an updated MCP bridge for run-specific controls.",
+            )
+        return await self.rpc(operation, run_id=run_id)
+
+    async def _stop_owned_run(self, run_id):
+        if "run_id_control" not in self.info.get("capabilities", []):
+            # Older bridges stop only the controller's own run on disconnect.
+            self.completion_unknown = True
+            await self.close()
+            return
+        await self.control_run("stop", run_id)
+
     async def call(self, operation, *, timeout=None, **arguments):
         if operation == "export_script":
             reply = await self.rpc(operation)
@@ -136,17 +152,20 @@ class DesktopWorker:
                             "revision": self.revision,
                         }
                     if asyncio.get_running_loop().time() > deadline:
-                        await self.rpc("stop")
+                        await self._stop_owned_run(directory.name)
                         raise GmatError(
                             "TIMEOUT", "Desktop stop requested after timeout; application preserved"
                         )
                     await asyncio.sleep(0.05)
             except asyncio.CancelledError:
                 try:
-                    await asyncio.wait_for(self.rpc("stop"), 3)
-                    async with asyncio.timeout(3):
-                        while (await self.refresh()).get("running"):
-                            await asyncio.sleep(0.05)
+                    await asyncio.wait_for(self._stop_owned_run(directory.name), 3)
+                    if self.process.returncode is None:
+                        async with asyncio.timeout(3):
+                            while (state := await self.refresh()).get("running") and state.get(
+                                "run", {}
+                            ).get("run_id") == directory.name:
+                                await asyncio.sleep(0.05)
                 except Exception:
                     self.completion_unknown = True
                 raise
@@ -356,4 +375,4 @@ class Desktops:
         session = self.session(run["session_id"])
         if session.backend != "desktop":
             raise GmatError("UNSUPPORTED_CAPABILITY", "Pause/resume require a desktop backend")
-        return await session.worker.rpc(operation)
+        return await session.worker.control_run(operation, run_id)

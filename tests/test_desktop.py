@@ -3,11 +3,43 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from unittest.mock import AsyncMock
 
 import pytest
 
 from gmat_mcp.core import Manager
 from gmat_mcp.errors import GmatError
+
+
+async def test_staged_edit_rejects_desktop_version_observed_during_validation(manager, monkeypatch):
+    sid = (await manager.create_session("fake"))["session_id"]
+    await manager.load_script(sid, text="normal")
+    session = manager.session(sid)
+    session.backend = "desktop"
+    version = session.model_version
+    original = session.worker.call
+    snapshots = 0
+
+    async def export(operation, **arguments):
+        nonlocal snapshots
+        result = await original(operation, **arguments)
+        snapshots += 1
+        if snapshots == 2:
+            # The watcher observed a GUI build while the candidate was being validated.
+            session.model_version = "new-gui-build"
+        result["model_version"] = session.model_version
+        return result
+
+    monkeypatch.setattr(session.worker, "call", export)
+    apply = AsyncMock(return_value={"model_version": "overwritten"})
+    monkeypatch.setattr(session.worker, "rpc", apply, raising=False)
+    with pytest.raises(GmatError) as error:
+        await manager.edit_mission(
+            sid, version, [{"op": "set_field", "name": "Sat", "field": "DryMass", "value": 200}]
+        )
+    assert error.value.code == "STALE_VERSION"
+    assert session.model_version == "new-gui-build"
+    apply.assert_not_awaited()
 
 
 async def test_desktop_discovery_document_binding_timeout_and_safe_close(fake_config, tmp_path):

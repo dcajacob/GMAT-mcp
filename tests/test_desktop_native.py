@@ -160,10 +160,21 @@ async def test_live_desktop_bridge(native_config, tmp_path, transport):
                     "get_object", {"session_id": sid, "name": "AmericasGEO"}
                 )
                 assert busy.is_error
-                await call(client, "pause_run", run_id=running["run_id"])
-                paused = await call(client, "get_session", session_id=sid)
-                assert paused["desktop"]["paused"]
-                await call(client, "resume_run", run_id=running["run_id"])
+                guarded = "run_id_control" in session["engine"]["capabilities"]
+                stale = await client.call_tool("pause_run", {"run_id": run["run_id"]})
+                assert stale.is_error
+                assert ("RUN_NOT_ACTIVE" if guarded else "UNSUPPORTED_CAPABILITY") in stale.content[
+                    0
+                ].text
+                assert not (await call(client, "get_session", session_id=sid))["desktop"]["paused"]
+                if guarded:
+                    await call(client, "pause_run", run_id=running["run_id"])
+                    paused = await call(client, "get_session", session_id=sid)
+                    assert paused["desktop"]["paused"]
+                    stale = await client.call_tool("resume_run", {"run_id": run["run_id"]})
+                    assert stale.is_error and "RUN_NOT_ACTIVE" in stale.content[0].text
+                    assert (await call(client, "get_session", session_id=sid))["desktop"]["paused"]
+                    await call(client, "resume_run", run_id=running["run_id"])
                 logs = await call(client, "get_logs", session_id=sid)
                 assert logs["next_offset"] > 0
                 cancelled = await call(client, "cancel_run", run_id=running["run_id"])

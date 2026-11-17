@@ -332,7 +332,12 @@ class Studies:
             )
         finally:
             if sid:
-                await self.close_session(sid)
+                cleanup = asyncio.create_task(self.close_session(sid))
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    await cleanup
+                    raise
             self._save_study(study)
         return case
 
@@ -382,7 +387,7 @@ class Studies:
             study.update(status="failed", stop_reason="error", error=str(exc))
         finally:
             for task in pending:
-                if not task.done():
+                if not task.done() and not task.cancelling():
                     task.cancel()
             await asyncio.gather(*pending, return_exceptions=True)
             self._save_study(study)
@@ -414,12 +419,14 @@ class Studies:
             answers = []
             tasks = []
             keys = []
+            budget_exhausted = False
             for x in points.T:
                 key = tuple(float(n) for n in x)
                 keys.append(key)
                 if key not in cache:
                     if study["evaluations"] + len(tasks) >= study["max_evaluations"]:
-                        raise StudyLimit("evaluation_budget")
+                        budget_exhausted = True
+                        break
                     params = {
                         v["field"]: int(round(n)) if v.get("integer") else float(n)
                         for v, n in zip(variables, x)
@@ -431,6 +438,8 @@ class Studies:
             for key, task in tasks:
                 cache[key] = await task
                 active.discard(task)
+            if budget_exhausted:
+                raise StudyLimit("evaluation_budget")
             for key in keys:
                 case = cache[key]
                 if constraints:
@@ -501,7 +510,8 @@ class Studies:
         finally:
             stop.set()
             for task in active:
-                task.cancel()
+                if not task.cancelling():
+                    task.cancel()
             await asyncio.gather(*active, return_exceptions=True)
 
     def compare_runs(self, run_ids):

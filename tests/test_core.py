@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,38 @@ async def finished(manager, run):
 
 async def opened(manager):
     return (await manager.create_session("fake"))["session_id"]
+
+
+async def test_cancel_during_result_processing_preserves_finished_run(manager, monkeypatch):
+    sid = await opened(manager)
+    await manager.load_script(sid, text="normal")
+    processing = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    finalize = manager._finalize_results
+
+    def hold_results(run):
+        loop.call_soon_threadsafe(processing.set)
+        assert release.wait(10)
+        finalize(run)
+
+    monkeypatch.setattr(manager, "_finalize_results", hold_results)
+    run = await manager.run_mission(sid)
+    run_id = run["run_id"]
+    await asyncio.wait_for(processing.wait(), 10)
+    cancellations = [asyncio.create_task(manager.cancel_run(run_id)) for _ in range(2)]
+    try:
+        done, _ = await asyncio.wait(cancellations, timeout=0.05)
+        assert not done
+        assert manager.session(sid).lock.locked()
+        assert manager.get_run(run_id)["results_status"] == "processing"
+    finally:
+        release.set()
+        replies = await asyncio.gather(*cancellations)
+    assert all(r["status"] == "succeeded" for r in replies)
+    persisted = json.loads((Path(run["directory"]) / "run.json").read_text())
+    assert persisted == manager.catalog.run(run_id) == manager.get_run(run_id)
+    assert persisted["results_finalized"]
 
 
 def test_relocates_startup_preserving_plugin_order_and_paths(tmp_path):

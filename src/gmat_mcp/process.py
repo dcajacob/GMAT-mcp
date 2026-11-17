@@ -107,24 +107,35 @@ def spawn_options() -> dict:
 
 
 async def terminate(process: asyncio.subprocess.Process) -> None:
-    if process.returncode is not None:
-        return
-    try:
-        if sys.platform == "win32":
-            process.terminate()
-        else:
-            os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
+    if sys.platform == "win32":
+        if process.returncode is None:
+            try:
+                process.terminate()
+                await asyncio.wait_for(process.wait(), 3)
+            except TimeoutError:
+                process.kill()
+            except ProcessLookupError:
+                pass
         await process.wait()
         return
+
+    # start_new_session makes the worker's PID its private process group ID.
+    # A plugin child can outlive the leader, including one that ignores SIGTERM.
+    pgid = process.pid
+    if process.returncode is not None and process_alive(pgid):
+        return  # The PID has already been reassigned.
     try:
-        await asyncio.wait_for(process.wait(), 3)
+        os.killpg(pgid, signal.SIGTERM)
+        async with asyncio.timeout(3):
+            await process.wait()
+            while True:
+                os.killpg(pgid, 0)
+                await asyncio.sleep(0.05)
     except TimeoutError:
         try:
-            if sys.platform == "win32":
-                process.kill()
-            else:
-                os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        await process.wait()
+    except ProcessLookupError:
+        pass
+    await process.wait()

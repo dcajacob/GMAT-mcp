@@ -168,3 +168,24 @@ time.sleep(120)
         assert not process_alive(child)
     finally:
         await terminate(process)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX worker process group")
+async def test_cleanup_after_group_leader_exits():
+    import asyncio
+
+    from gmat_mcp.process import spawn_options, terminate
+
+    # The child owns the remaining write end of stdout. EOF confirms cleanup even
+    # on systems where the orphan's new parent takes time to reap its exit status.
+    child = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('ready', flush=True); time.sleep(15)"
+    leader = "import subprocess,sys; subprocess.Popen([sys.executable, '-c', sys.argv[1]])"
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", leader, child, stdout=asyncio.subprocess.PIPE, **spawn_options()
+    )
+    async with asyncio.timeout(10):
+        assert await proc.stdout.readline() == b"ready\n"
+        while proc.returncode is None:
+            await asyncio.sleep(0.01)
+        await terminate(proc)
+        assert await proc.stdout.read() == b""

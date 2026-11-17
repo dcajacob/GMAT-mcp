@@ -76,7 +76,15 @@ class Capabilities(Studies, Desktops):
         }
 
     async def _stage(
-        self, session, snapshot, transform=None, validation="parse", dry_run=False, remember=True
+        self,
+        session,
+        snapshot,
+        transform=None,
+        validation="parse",
+        dry_run=False,
+        *,
+        expected_version,
+        remember=True,
     ):
         from .core import Worker
 
@@ -122,6 +130,8 @@ class Capabilities(Studies, Desktops):
                 if directives:
                     exported["text"] = "\n".join(directives) + "\n" + exported["text"]
             before = await self._snapshot(session)
+            if session.backend == "desktop":
+                self._version(session, expected_version)
             diff = "".join(
                 difflib.unified_diff(
                     before["text"].splitlines(True),
@@ -135,7 +145,7 @@ class Capabilities(Studies, Desktops):
                     state = await session.worker.rpc(
                         "apply_script",
                         text=exported["text"],
-                        expected_version=session.model_version,
+                        expected_version=expected_version,
                         project_dir=snapshot["project_dir"],
                     )
                     session.worker.state = state
@@ -206,6 +216,7 @@ class Capabilities(Studies, Desktops):
                 snapshot,
                 metadata,
                 validation="parse" if session.backend == "desktop" else "initialize",
+                expected_version=expected_version,
             )
             return {**reply, "datasets": session.datasets}
 
@@ -242,7 +253,9 @@ class Capabilities(Studies, Desktops):
                     elif change not in command_changes:
                         raise GmatError("INVALID_ARGUMENT", f"Unsupported edit: {op}")
 
-            return await self._stage(session, snapshot, apply, validation, dry_run)
+            return await self._stage(
+                session, snapshot, apply, validation, dry_run, expected_version=expected_version
+            )
 
     async def restore_edit(self, session_id, expected_version, redo=False):
         session = self.session(session_id)
@@ -254,7 +267,9 @@ class Capabilities(Studies, Desktops):
                 raise GmatError("NO_HISTORY", "No snapshot available")
             snapshot = source[-1]
             current = await self._snapshot(session)
-            reply = await self._stage(session, snapshot, remember=False)
+            reply = await self._stage(
+                session, snapshot, expected_version=expected_version, remember=False
+            )
             source.pop()
             (session.history if redo else session.future).append(current)
             return reply

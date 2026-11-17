@@ -312,8 +312,12 @@ version: use `edit_mission`, `configure_results(expected_version=...)` or
 protected; `build_desktop` explicitly builds current editor text. Desktop edits support
 parse validation; object initialization is checked on GUI Run. Worker sessions also
 support independent initialization validation. Operations run on Qt's owning thread,
-and status/logs remain accessible during execution. `pause_run`/`resume_run` use Qt's
-native controls. A document switch requires explicit reattachment.
+and status/logs remain accessible during execution. Desktops advertising
+`run_id_control` support `pause_run`, `resume_run` and stopping a GUI-started run.
+The bridge checks the requested run ID in the GUI thread. On older desktops, use
+the GUI for these controls, or rebuild with the bridge in `integrations/`.
+MCP-owned runs on older desktops receive a cooperative stop on disconnect.
+A document switch requires explicit reattachment.
 
 MCP-started runs appear in the GUI's existing views. GUI-started runs become visible
 through `get_session` while attached, including their available artifacts and solver

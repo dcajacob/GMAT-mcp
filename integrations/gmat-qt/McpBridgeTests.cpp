@@ -54,6 +54,11 @@ int main(int argc,char **argv)
       auto state=ask("attach")["result"].toObject();
       const auto doc=state["document_id"].toString(),version=state["model_version"].toString();
       const QJsonObject args{{"document_id",doc},{"expected_version",version}};
+      for (const auto *control : {"pause", "resume", "stop"}) {
+         const auto idle=ask(control,{{"document_id",doc},{"run_id","old"}});
+         require(!idle["ok"].toBool() && idle["error"].toObject()["code"]=="RUN_NOT_ACTIVE",
+                 "Idle desktop accepted a run control");
+      }
       require(!ask("build",{{"document_id",doc},{"expected_version","stale"}})["ok"].toBool(),"Stale build accepted");
       auto *editor=window.findChild<QPlainTextEdit *>("scriptEditor");require(editor,"Editor absent");
       editor->appendPlainText("% GUI edit");

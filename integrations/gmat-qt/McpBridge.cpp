@@ -120,7 +120,7 @@ McpBridge::McpBridge(MainWindow &value,const QString &directory) : QObject(&valu
    QJsonArray classes;for(const auto &name:Moderator::Instance()->GetListOfAllFactoryItems()) classes.append(QString::fromStdString(name));
    engineInfo={{"python","desktop C++"},{"platform",QSysInfo::prettyProductName()},{"api","GMAT-Qt live desktop bridge"},
       {"version",QString::fromStdString(GmatGlobal::Instance()->GetGmatVersion())},{"build_date",QString::fromStdString(GmatGlobal::Instance()->GetGMATBuildDate())},
-      {"native_libraries",QJsonArray{}},{"classes",classes},{"capabilities",QJsonArray{"objects","commands","scripts","execution","runtime_state","live_desktop","pause_resume","solver_listener"}}};
+      {"native_libraries",QJsonArray{}},{"classes",classes},{"capabilities",QJsonArray{"objects","commands","scripts","execution","runtime_state","live_desktop","pause_resume","run_id_control","solver_listener"}}};
    connect(&server,&QTcpServer::newConnection,this,[this] {
       while (auto *socket=server.nextPendingConnection()) {
          socket->setReadBufferSize(1024*1024+1);
@@ -188,6 +188,9 @@ QJsonObject McpBridge::dispatch(const QJsonObject &request,QTcpSocket *socket)
    if (op=="state") return state();
    if (op=="stop" || op=="pause" || op=="resume") {
       if (a.value("document_id")!=state().value("document_id")) throw std::runtime_error("DOCUMENT_CHANGED");
+      const auto requestedRun = a.value("run_id").toString();
+      if (!window.running || requestedRun.isEmpty() || run.value("run_id").toString()!=requestedRun)
+         throw std::runtime_error("RUN_NOT_ACTIVE");
       if (op=="stop") window.stopMission();else if(op=="pause") window.pauseMission();else window.resumeMission();return state();
    }
    if (op=="logs") {
